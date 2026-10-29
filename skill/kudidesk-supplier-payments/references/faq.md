@@ -19,7 +19,7 @@ A: No, for security reasons money can only go to pre-saved supplier wallets. I c
 A: If your Naira payment fails on Paystack, no money moves. You can try again with the same link or get a new one.
 
 **Q: How do I know the supplier received the money?**
-A: After settlement, I'll share a Basescan explorer link where you can verify the USDC transfer on-chain.
+A: After settlement, I'll share an Arcscan explorer link where you can verify the USDC transfer on-chain.
 
 **Q: Is this real money?**
-A: This is a test/demo environment using Paystack test mode and Base Sepolia testnet. No real money is involved.
+A: This is a test/demo environment using Paystack test mode and Arc testnet. No real money is involved.

@@ -9,9 +9,9 @@
 
 ## Settlement
 - **Payment method:** Naira via Paystack (test mode)
-- **Payout:** Dollar stablecoin (USDC) on Base Sepolia testnet
+- **Payout:** Dollar stablecoin (USDC) on Arc testnet
 - **Settlement time:** Usually minutes after payment verification
-- **What "on-chain" means:** The USDC transfer is recorded on the Base Sepolia blockchain - you can verify it on Basescan
+- **What "on-chain" means:** The USDC transfer is recorded on the Arc testnet blockchain - you can verify it on Arcscan
 
 ## Treasury
 - Treasury maintains USDC balance for settlements

@@ -121,6 +121,34 @@ async def test_supplier_from_another_customer_rejected(tools):
     assert resp["code"] == "SUPPLIER_NOT_SAVED"
 
 
+async def test_quote_refused_while_supplier_address_is_a_placeholder(store, monkeypatch):
+    """seed.json ships '0xSUPPLIER_WALLET_2'. Taking the customer's money for a
+    payout that cannot be made would be the worst possible failure, so quoting
+    must stop here — before Paystack is ever called."""
+    import json
+    import sqlite3
+
+    conn = sqlite3.connect(store.db_path)
+    row = conn.execute(
+        "SELECT suppliers_json FROM customers WHERE account_code = 'KD-001'"
+    ).fetchone()
+    suppliers = json.loads(row[0])
+    suppliers[1]["address"] = "0xSUPPLIER_WALLET_2"
+    conn.execute(
+        "UPDATE customers SET suppliers_json = ? WHERE account_code = 'KD-001'",
+        (json.dumps(suppliers),),
+    )
+    conn.commit()
+    conn.close()
+
+    tools = make_tools(store, monkeypatch, fake_paystack=None, fake_chain=FakeChain())
+    token = await auth(tools)
+    resp = await quote(tools, token, supplier="guangzhou-cables")
+    assert resp["ok"] is False
+    assert resp["code"] == "SUPPLIER_NOT_SAVED"
+    assert resp["data"]["reason"] == "SUPPLIER_ADDRESS_NOT_CONFIGURED"
+
+
 async def test_over_limit_rejected(tools):
     token = await auth(tools)
     resp = await quote(tools, token, usd="60")  # KD-001 cap is 50
@@ -156,6 +184,51 @@ async def test_treasury_low_blocks_quote(store, monkeypatch):
     # 10 + 2 buffer = 12 > 3 available
     resp = await quote(tools, token, usd="10")
     assert resp["code"] == "TREASURY_LOW"
+
+
+async def test_gas_is_counted_against_the_treasury(store, monkeypatch):
+    """Balance covers amount + buffer but not amount + buffer + gas."""
+    chain = FakeChain(balance_usdc="12.5", gas_usdc="0.75")
+    tools = make_tools(store, monkeypatch, fake_paystack=None, fake_chain=chain)
+    token = await auth(tools)
+    # 10 + 2 + 0.75 = 12.75 > 12.5
+    resp = await quote(tools, token, usd="10")
+    assert resp["code"] == "TREASURY_LOW"
+    assert resp["data"]["required_usdc"] == "12.75"
+    assert chain.transfers == []
+
+
+async def test_gas_fits_so_quote_is_allowed(store, monkeypatch):
+    chain = FakeChain(balance_usdc="12.8", gas_usdc="0.75")
+    tools = make_tools(store, monkeypatch, fake_paystack=None, fake_chain=chain)
+    token = await auth(tools)
+    resp = await quote(tools, token, usd="10")
+    assert resp["ok"] is True
+
+
+async def test_native_gas_shortfall_blocks_quote(store, monkeypatch):
+    """On a chain where gas is a separate token, a dry gas balance is fatal."""
+
+    class NativeShortChain(FakeChain):
+        def check_treasury(self, amount_usdc, buffer_usdc, gas_limit=None):
+            return {"ok": False, "reason": "NATIVE_GAS_LOW", "required_usdc": "12"}
+
+    tools = make_tools(store, monkeypatch, fake_paystack=None, fake_chain=NativeShortChain())
+    token = await auth(tools)
+    resp = await quote(tools, token, usd="10")
+    assert resp["code"] == "TREASURY_LOW"
+    assert resp["data"]["reason"] == "NATIVE_GAS_LOW"
+
+
+async def test_explorer_url_comes_from_chain_config(store, monkeypatch):
+    chain = FakeChain(explorer_base="https://monad.example/tx/")
+    tools = make_tools(store, monkeypatch, fake_paystack=FakePaystack(), fake_chain=chain)
+    token = await auth(tools)
+    qid = quote_id_of(await quote(tools, token))
+    tools.paystack.expected_amount = store.get_quote(qid)["kobo"]
+    resp = await tools.verify_and_settle(token, qid)
+    assert resp["code"] == "SETTLED"
+    assert resp["data"]["explorer_url"].startswith("https://monad.example/tx/0x")
 
 
 # --- create_naira_payment -------------------------------------------------
@@ -284,9 +357,9 @@ async def test_happy_path_settles(store, monkeypatch):
     resp = await tools.verify_and_settle(token, qid)
     assert resp["ok"] is True
     assert resp["code"] == "SETTLED"
-    assert resp["data"]["explorer_url"].startswith("https://sepolia.basescan.org/tx/0x")
+    assert resp["data"]["explorer_url"].startswith("https://testnet.arcscan.app/tx/0x")
     assert len(chain.transfers) == 1
-    assert chain.transfers[0]["to"] == "0xSUPPLIER_WALLET_1"
+    assert chain.transfers[0]["to"] == "0x1111111111111111111111111111111111111111"
     assert chain.transfers[0]["amount"] == "10"
     assert store.get_quote(qid)["status"] == "SETTLED"
 

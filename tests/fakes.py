@@ -52,17 +52,65 @@ class FakePaystack:
 
 
 class FakeChain:
-    def __init__(self, balance_usdc="20", receipt_status=1, receipt_mined=True):
+    """Stands in for ChainClient. No network, deterministic gas."""
+
+    def __init__(
+        self,
+        balance_usdc="20",
+        receipt_status=1,
+        receipt_mined=True,
+        gas_usdc="0",
+        native_balance_wei=10**18,
+        gas_token_is_usdc=True,
+        explorer_base="https://testnet.arcscan.app/tx/",
+    ):
         self.balance_usdc = balance_usdc
         self.receipt_status = receipt_status
         self.receipt_mined = receipt_mined
+        self.gas_usdc = gas_usdc
+        self.native_balance_wei = native_balance_wei
+        self.gas_token_is_usdc = gas_token_is_usdc
+        self.explorer_base = explorer_base
         self.transfers = []
+        self.treasury_checks = []
         self._tx_counter = 0
 
     def get_usdc_balance(self, address=None):
         from decimal import Decimal
 
-        return int(Decimal(self.balance_usdc) * Decimal(10**6))
+        return int(Decimal(str(self.balance_usdc)) * Decimal(10**6))
+
+    def get_native_balance(self, address=None):
+        return self.native_balance_wei
+
+    def estimate_fee_usdc(self, gas_limit=None):
+        from decimal import Decimal
+
+        return Decimal(str(self.gas_usdc))
+
+    def explorer_url(self, tx_hash):
+        return self.explorer_base.rstrip("/") + "/" + tx_hash
+
+    def check_treasury(self, amount_usdc, buffer_usdc, gas_limit=None):
+        from decimal import Decimal
+
+        amount = Decimal(str(amount_usdc))
+        buffer_ = Decimal(str(buffer_usdc))
+        gas = Decimal(str(self.gas_usdc))
+        required = amount + buffer_ + gas
+        available = Decimal(str(self.balance_usdc))
+        self.treasury_checks.append(
+            {"amount": str(amount), "buffer": str(buffer_), "gas": str(gas), "required": str(required)}
+        )
+        ok = available >= required
+        return {
+            "ok": ok,
+            "usdc_balance": str(available),
+            "gas_usdc": str(gas),
+            "buffer_usdc": str(buffer_),
+            "required_usdc": str(required),
+            "reason": None if ok else "USDC_LOW",
+        }
 
     async def transfer_usdc(self, to_address, amount_usdc):
         self._tx_counter += 1
@@ -73,7 +121,12 @@ class FakeChain:
     async def wait_for_receipt(self, tx_hash, timeout=45):
         if not self.receipt_mined:
             return {"status": None, "timeout": True}
-        return {"status": self.receipt_status, "block_number": 1}
+        return {
+            "status": self.receipt_status,
+            "block_number": 1,
+            "gas_used": 60000,
+            "gas_paid_usdc": "0.001",
+        }
 
     async def get_transaction_receipt(self, tx_hash):
         if not self.receipt_mined:

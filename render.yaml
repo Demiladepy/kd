@@ -13,11 +13,21 @@ services:
         sync: false
       - key: PUBLIC_BASE_URL
         sync: false
-      - key: BASE_SEPOLIA_RPC
-        value: https://sepolia.base.org
       - key: TREASURY_PRIVATE_KEY
         sync: false
-      - key: USDC_ADDRESS
-        value: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
       - key: DB_PATH
         value: ./kudidesk.db
+      # Chain config — no secrets, safe to keep here. Override in the dashboard
+      # to switch testnets without a code change.
+      - key: CHAIN_NAME
+        value: arc-testnet
+      - key: CHAIN_ID
+        value: "5042002"
+      - key: RPC_URL
+        value: https://rpc.testnet.arc.network
+      - key: USDC_ADDRESS
+        value: "0x3600000000000000000000000000000000000000"
+      - key: EXPLORER_TX_URL
+        value: https://testnet.arcscan.app/tx/
+      - key: GAS_TOKEN_IS_USDC
+        value: "true"

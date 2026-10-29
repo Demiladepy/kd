@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 from .store import Store
 from .paystack import PaystackClient
-from .chain import ChainClient
+from .chain import ChainClient, is_valid_address
 
 
 class KudiDeskTools:
@@ -22,6 +22,23 @@ class KudiDeskTools:
         except Exception as e:
             self.chain = None
         self._quote_locks = {}
+
+    def _explorer(self, tx_hash: str) -> str:
+        if self.chain is not None and hasattr(self.chain, "explorer_url"):
+            return self.chain.explorer_url(tx_hash)
+        base = os.getenv("EXPLORER_TX_URL", "")
+        if base:
+            return f"{base.rstrip('/')}/{tx_hash}"
+        return tx_hash
+
+    def _treasury_check(self, amount_usdc: Decimal, buffer_usdc: Decimal, gas_limit=None):
+        """Delegate to the chain adapter so gas policy lives in one place."""
+        if self.chain is None:
+            return {"ok": True, "skipped": "no chain configured"}
+        try:
+            return self.chain.check_treasury(amount_usdc, buffer_usdc, gas_limit)
+        except Exception as exc:  # node hiccup must not fake a pass
+            return {"ok": False, "reason": "BALANCE_UNAVAILABLE", "error": str(exc)}
     
     def _log_call(self, tool: str, code: str, latency_ms: float, args: Dict = None):
         log_entry = {
@@ -129,18 +146,34 @@ class KudiDeskTools:
                 self._log_call("create_quote", "CUSTOMER_NOT_FOUND", (time.time() - start) * 1000)
                 return resp
             
-            # Check supplier
+            # Check supplier is saved for this customer AND payable
             supplier_found = False
             supplier_display = None
+            supplier_address = None
             for s in customer.get("suppliers_full", []):
                 if s["label"] == supplier_label:
                     supplier_found = True
                     supplier_display = s["display"]
+                    supplier_address = s.get("address")
                     break
-            
+
             if not supplier_found:
                 resp = self._make_response(False, "SUPPLIER_NOT_SAVED", {}, 
                                          "That supplier isn't on file for this customer. I need to escalate this to a human - I can't add new suppliers or accept wallet addresses in chat.")
+                self._log_call("create_quote", "SUPPLIER_NOT_SAVED", (time.time() - start) * 1000)
+                return resp
+
+            # Refuse to quote for an address we cannot actually pay, otherwise the
+            # customer pays and the payout fails afterwards.
+            if not is_valid_address(supplier_address or ""):
+                resp = self._make_response(
+                    False,
+                    "SUPPLIER_NOT_SAVED",
+                    {"reason": "SUPPLIER_ADDRESS_NOT_CONFIGURED"},
+                    "That supplier's payout details aren't set up properly yet, so I "
+                    "can't take payment for this one. A human will sort it out and come "
+                    "back to you.",
+                )
                 self._log_call("create_quote", "SUPPLIER_NOT_SAVED", (time.time() - start) * 1000)
                 return resp
             
@@ -174,19 +207,18 @@ class KudiDeskTools:
                 self._log_call("create_quote", "AMOUNT_OVER_LIMIT", (time.time() - start) * 1000)
                 return resp
             
-            # Check treasury
+            # Check treasury: amount + gas ceiling + buffer, all in USDC on Arc
             if self.chain:
-                try:
-                    treasury_balance = self.chain.get_usdc_balance()
-                    treasury_usdc = Decimal(treasury_balance) / Decimal(10**6)
-                    buffer = Decimal(str(config["treasury_min_buffer_usdc"]))
-                    if treasury_usdc < usd + buffer:
-                        resp = self._make_response(False, "TREASURY_LOW", {}, 
-                                                 "Treasury is low right now. I need to escalate to a human for assistance.")
-                        self._log_call("create_quote", "TREASURY_LOW", (time.time() - start) * 1000)
-                        return resp
-                except Exception:
-                    pass
+                config = self.store.get_desk_config()
+                buffer_usdc = Decimal(str(config["treasury_min_buffer_usdc"]))
+                check = self._treasury_check(usd, buffer_usdc)
+                if not check.get("ok"):
+                    resp = self._make_response(False, "TREASURY_LOW", {
+                        "reason": check.get("reason"),
+                        "required_usdc": check.get("required_usdc"),
+                    }, "Treasury is low right now. I need to escalate to a human for assistance.")
+                    self._log_call("create_quote", "TREASURY_LOW", (time.time() - start) * 1000)
+                    return resp
             
             quote = self.store.create_quote(account_code, supplier_label, usd_amount, invoice_ref)
             quote["supplier_display"] = supplier_display
@@ -327,7 +359,7 @@ class KudiDeskTools:
                 resp = self._make_response(True, "ALREADY_SETTLED", {
                     "quote_id": quote_id,
                     "tx_hash": quote["tx_hash"],
-                    "explorer_url": f"https://sepolia.basescan.org/tx/{quote['tx_hash']}"
+                    "explorer_url": self._explorer(quote['tx_hash'])
                 }, "This payment has already been settled.")
                 self._log_call("verify_and_settle", "ALREADY_SETTLED", (time.time() - start) * 1000)
                 return resp
@@ -341,7 +373,7 @@ class KudiDeskTools:
                             resp = self._make_response(True, "SETTLED", {
                                 "quote_id": quote_id,
                                 "tx_hash": quote["tx_hash"],
-                                "explorer_url": f"https://sepolia.basescan.org/tx/{quote['tx_hash']}"
+                                "explorer_url": self._explorer(quote['tx_hash'])
                             }, "Payment has been settled on-chain.")
                             self._log_call("verify_and_settle", "SETTLED", (time.time() - start) * 1000)
                             return resp
@@ -357,7 +389,7 @@ class KudiDeskTools:
                         resp = self._make_response(True, "SETTLEMENT_PENDING", {
                             "quote_id": quote_id,
                             "tx_hash": quote["tx_hash"],
-                            "explorer_url": f"https://sepolia.basescan.org/tx/{quote['tx_hash']}"
+                            "explorer_url": self._explorer(quote['tx_hash'])
                         }, "Settlement is still pending. The funds are on their way.")
                         self._log_call("verify_and_settle", "SETTLEMENT_PENDING", (time.time() - start) * 1000)
                         return resp
@@ -365,7 +397,7 @@ class KudiDeskTools:
                     resp = self._make_response(True, "SETTLEMENT_PENDING", {
                         "quote_id": quote_id,
                         "tx_hash": quote["tx_hash"],
-                        "explorer_url": f"https://sepolia.basescan.org/tx/{quote['tx_hash']}"
+                        "explorer_url": self._explorer(quote['tx_hash'])
                     }, "Settlement is still pending.")
                     self._log_call("verify_and_settle", "SETTLEMENT_PENDING", (time.time() - start) * 1000)
                     return resp
@@ -420,19 +452,26 @@ class KudiDeskTools:
                 quote = self.store.get_quote(quote_id)
                 
                 if self.chain:
-                    try:
-                        treasury_balance = self.chain.get_usdc_balance()
-                        treasury_usdc = Decimal(treasury_balance) / Decimal(10**6)
-                        config = self.store.get_desk_config()
-                        usd_amount = Decimal(quote["usd_amount"])
-                        buffer = Decimal(str(config["treasury_min_buffer_usdc"]))
-                        if treasury_usdc < usd_amount + buffer:
-                            resp = self._make_response(False, "TREASURY_LOW", {}, 
-                                                     "I apologize, but our treasury is low. Your payment was received but I need to escalate to a human for settlement. We'll follow up shortly.")
-                            self._log_call("verify_and_settle", "TREASURY_LOW", (time.time() - start) * 1000)
-                            return resp
-                    except Exception:
-                        pass
+                    config = self.store.get_desk_config()
+                    usd_amount = Decimal(quote["usd_amount"])
+                    buffer_usdc = Decimal(str(config["treasury_min_buffer_usdc"]))
+                    check = self._treasury_check(usd_amount, buffer_usdc)
+                    if not check.get("ok"):
+                        # Money in, nothing out: stay PAID so a human can settle.
+                        resp = self._make_response(
+                            False,
+                            "TREASURY_LOW",
+                            {
+                                "quote_id": quote_id,
+                                "reason": check.get("reason"),
+                                "required_usdc": check.get("required_usdc"),
+                            },
+                            "I'm really sorry - your payment came through, but our treasury is "
+                            "short right now so I can't send it yet. A human will follow up "
+                            "shortly and your money is safe with us.",
+                        )
+                        self._log_call("verify_and_settle", "TREASURY_LOW", (time.time() - start) * 1000)
+                        return resp
                 
                 supplier_address = self.store.get_supplier_address(quote["account_code"], quote["supplier_label"])
                 if not supplier_address:
@@ -458,7 +497,7 @@ class KudiDeskTools:
                             resp = self._make_response(True, "ALREADY_SETTLED", {
                                 "quote_id": quote_id,
                                 "tx_hash": quote_check.get("tx_hash"),
-                                "explorer_url": f"https://sepolia.basescan.org/tx/{quote_check.get('tx_hash')}"
+                                "explorer_url": self._explorer(quote_check.get('tx_hash'))
                             }, "Already settled.")
                             self._log_call("verify_and_settle", "ALREADY_SETTLED", (time.time() - start) * 1000)
                             return resp
@@ -471,7 +510,7 @@ class KudiDeskTools:
                                     resp = self._make_response(True, "SETTLED", {
                                         "quote_id": quote_id,
                                         "tx_hash": quote_check["tx_hash"],
-                                        "explorer_url": f"https://sepolia.basescan.org/tx/{quote_check['tx_hash']}"
+                                        "explorer_url": self._explorer(quote_check['tx_hash'])
                                     }, "Payment has been settled on-chain.")
                                     self._log_call("verify_and_settle", "SETTLED", (time.time() - start) * 1000)
                                     return resp
@@ -484,7 +523,7 @@ class KudiDeskTools:
                             resp = self._make_response(True, "SETTLEMENT_PENDING", {
                                 "quote_id": quote_id,
                                 "tx_hash": quote_check["tx_hash"],
-                                "explorer_url": f"https://sepolia.basescan.org/tx/{quote_check['tx_hash']}"
+                                "explorer_url": self._explorer(quote_check['tx_hash'])
                             }, "Settlement is still pending.")
                             self._log_call("verify_and_settle", "SETTLEMENT_PENDING", (time.time() - start) * 1000)
                             return resp
@@ -498,7 +537,7 @@ class KudiDeskTools:
                             resp = self._make_response(True, "SETTLEMENT_PENDING", {
                                 "quote_id": quote_id,
                                 "tx_hash": tx_hash,
-                                "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash}"
+                                "explorer_url": self._explorer(tx_hash)
                             }, "Settlement is on the way. Here's the explorer link.")
                             self._log_call("verify_and_settle", "SETTLEMENT_PENDING", (time.time() - start) * 1000)
                             return resp
@@ -507,7 +546,7 @@ class KudiDeskTools:
                             resp = self._make_response(True, "SETTLED", {
                                 "quote_id": quote_id,
                                 "tx_hash": tx_hash,
-                                "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash}"
+                                "explorer_url": self._explorer(tx_hash)
                             }, "Payment settled successfully! Here's the explorer link.")
                             self._log_call("verify_and_settle", "SETTLED", (time.time() - start) * 1000)
                             return resp
@@ -516,7 +555,7 @@ class KudiDeskTools:
                             resp = self._make_response(False, "SETTLE_FAILED", {
                                 "quote_id": quote_id,
                                 "tx_hash": tx_hash,
-                                "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash}"
+                                "explorer_url": self._explorer(tx_hash)
                             }, "Settlement failed. I need to escalate to a human.")
                             self._log_call("verify_and_settle", "SETTLE_FAILED", (time.time() - start) * 1000)
                             return resp

@@ -92,8 +92,10 @@ def test_supplier_address_never_leaves_store_masked(store):
 
 
 def test_full_address_still_resolvable_server_side(store):
+    from tests.conftest import ADDR_1
+
     addr = store.get_supplier_address("KD-001", "yiwu-lighting")
-    assert addr == "0xSUPPLIER_WALLET_1"
+    assert addr == ADDR_1
 
 
 def test_idempotent_quote_lookup(store):

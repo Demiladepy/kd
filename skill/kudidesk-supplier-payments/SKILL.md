@@ -1,6 +1,6 @@
 ---
 name: kudidesk-supplier-payments
-description: KudiDesk supplier payment assistant for WhatsApp - PIN auth, quotes, Paystack collection, and USDC settlement to pre-saved suppliers on Base Sepolia
+description: KudiDesk supplier payment assistant for WhatsApp - PIN auth, quotes, Paystack collection, and USDC settlement to pre-saved suppliers on Arc testnet
 ---
 
 # KudiDesk Supplier Payments

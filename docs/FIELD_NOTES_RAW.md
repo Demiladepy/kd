@@ -54,4 +54,92 @@ $env:PYTEST_DISABLE_PLUGIN_AUTOLOAD="1"
 python -m pytest -p pytest_asyncio.plugin
 ```
 
-Result: `48 passed`. A clean virtualenv would avoid this entirely.
+Result: `73 passed`. A clean virtualenv would avoid this entirely.
+
+---
+
+## 2026-10-29 — Arc RPC returns 403 to Python's default urllib User-Agent
+
+Context: probing `https://rpc.testnet.arc.network` with `urllib.request` (the
+same body that `Invoke-RestMethod` accepted without complaint).
+
+Raw error:
+
+```
+urllib.error.HTTPError: HTTP Error 403: Forbidden
+```
+
+Cause: the endpoint filters on `User-Agent`. PowerShell sends its own; Python's
+default `Python-urllib/3.11` is refused. No body, no JSON-RPC error — just 403.
+
+Fix applied: set an explicit `User-Agent` header on the probe. `web3.py` through
+`HTTPProvider` worked without changes, so this only affected hand-rolled
+`urllib` calls. Worth knowing before assuming the RPC is down or the URL is
+wrong.
+
+---
+
+## 2026-10-29 — Arc native balance is 18 dp while USDC ERC-20 is 6 dp
+
+Context: PLAN.md §2 says "sources disagree on the native balance's decimals.
+Verify this on day one and log what you find." Verified by comparing
+`eth_getBalance` against `balanceOf()` for live addresses.
+
+Measured at block 69,684,820:
+
+```
+address                                      native / 1e18                    erc20 / 1e6
+0x9143698409426ac33b277decc9f20fa9049887ec   223.473480851711701627           223.473480
+0xd731d8b19205fe7a9a93ebed1da2f35d54af9c82    85.604548819568282194            85.604548
+0x24a078b7eb595c6b0f43dbf574a7282931a50d1a     5.483392876667516447             5.483392
+```
+
+Ratio in every sample: `~1e12`. The native amount divided by 1e18 equals the
+ERC-20 amount divided by 1e6 (after truncation to 6 dp; the native side carries
+sub-micro-USDC dust).
+
+Conclusion: **native balance = 18 decimals, ERC-20 USDC = 6 decimals, same
+asset.** Any code that treats `eth_getBalance` as a 6-decimal dollar figure
+under-reports by 1e12 — which would make a treasury look empty or, worse, make a
+payout look affordable when it is not.
+
+Fix applied: `chain.py` never mixes the two. Money reads use ERC-20 `balanceOf`;
+the native balance is only used for gas, and `native_to_usdc()` divides by 1e18
+with an explicit constant. Unit tests pin the 1e12 relationship.
+
+---
+
+## 2026-10-29 — `eth_estimateGas` reverts on an unfunded treasury
+
+Context: computing a gas estimate for an informational balance check, from a
+freshly generated throwaway key with 0 USDC.
+
+Raw error:
+
+```
+web3.exceptions.ContractLogicError: ('execution reverted: ERC20: transfer amount
+exceeds balance', '0x08c379a0...45524332303a207472616e7366657220616d6f756e7420
+657863656564732062616c616e6365')
+```
+
+Cause: the node simulates the transfer, so `estimate_gas` fails when the sender
+cannot cover it. Correct behaviour, but it crashed a read-only check.
+
+Fix applied: `estimate_gas_limit()` falls back to a 90 000 ceiling on any
+estimation failure. The fallback is a fee *ceiling* — unused gas is refunded — so
+being generous costs nothing but headroom. A real out-of-gas would still surface
+as `SETTLE_FAILED` rather than a crash.
+
+---
+
+## 2026-10-29 — seed.json placeholders would take money for an impossible payout
+
+Not an error message — a design hole found by reading the plan against the code.
+`seed.json` ships `"address": "0xSUPPLIER_WALLET_1"`. If a human forgets to
+replace them, `create_quote` succeeds, the customer pays through Paystack, and
+only then does the transfer fail on an invalid checksum — money in, nothing out.
+
+Fix applied: `create_quote` validates the resolved address with
+`Web3.is_address` and returns `SUPPLIER_NOT_SAVED` with
+`data.reason == "SUPPLIER_ADDRESS_NOT_CONFIGURED"` **before** any Paystack link
+is created. Covered by `test_quote_refused_while_supplier_address_is_a_placeholder`.
