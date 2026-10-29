@@ -20,13 +20,13 @@ ADDR_3 = "0x3333333333333333333333333333333333333333"
 
 
 def install_supplier_addresses(db_path):
-    """Replace seed placeholders with valid EVM addresses for tests."""
+    """Force deterministic supplier addresses so tests never depend on seed data."""
     import json
 
     mapping = {
-        "0xSUPPLIER_WALLET_1": ADDR_1,
-        "0xSUPPLIER_WALLET_2": ADDR_2,
-        "0xSUPPLIER_WALLET_3": ADDR_3,
+        ("KD-001", "yiwu-lighting"): ADDR_1,
+        ("KD-001", "guangzhou-cables"): ADDR_2,
+        ("KD-002", "shaoxing-fabrics"): ADDR_3,
     }
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -34,7 +34,9 @@ def install_supplier_addresses(db_path):
     for row in rows:
         suppliers = json.loads(row["suppliers_json"])
         for s in suppliers:
-            s["address"] = mapping.get(s["address"], s["address"])
+            key = (row["account_code"], s["label"])
+            if key in mapping:
+                s["address"] = mapping[key]
         conn.execute(
             "UPDATE customers SET suppliers_json = ? WHERE account_code = ?",
             (json.dumps(suppliers), row["account_code"]),

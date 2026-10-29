@@ -282,7 +282,11 @@ class KudiDeskTools:
             
             public_base_url = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
             callback_url = public_base_url + "/paid"
-            email = f"{quote['account_code'].lower()}@customers.kudidesk.test"
+            # Paystack rejects the .test TLD outright ("email" must be a valid
+            # email), so PLAN.md section 4.3's literal form cannot be used.
+            # example.com is RFC 2606-reserved, syntactically valid, and never
+            # deliverable - which is exactly what a generated receipt address wants.
+            email = f"{quote['account_code'].lower()}@customers.example.com"
             metadata = {
                 "quote_id": quote_id,
                 "invoice_ref": quote["invoice_ref"],

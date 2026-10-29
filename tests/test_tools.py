@@ -38,6 +38,22 @@ def set_status(db_path, quote_id, status, **fields):
     conn.close()
 
 
+async def test_paystack_email_uses_a_valid_tld(store, monkeypatch):
+    """Paystack returns 400 '"email" must be a valid email' for any .test address.
+
+    Measured 2026-10-29; PLAN.md section 4.3's literal email is not accepted.
+    """
+    paystack = FakePaystack()
+    tools = make_tools(store, monkeypatch, fake_paystack=paystack, fake_chain=FakeChain())
+    token = await auth(tools)
+    qid = quote_id_of(await quote(tools, token))
+    await tools.create_naira_payment(token, qid)
+
+    email = paystack.initialize_calls[0]["email"]
+    assert email == "kd-001@customers.example.com"
+    assert not email.endswith(".test")
+
+
 # --- start_session ---------------------------------------------------------
 
 

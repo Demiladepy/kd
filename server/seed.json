@@ -1,7 +1,7 @@
 {
   "desk": {
     "name": "KudiDesk",
-    "ngn_per_usd": 0,
+    "ngn_per_usd": 1500,
     "fee_pct": "1.5",
     "quote_ttl_minutes": 10,
     "min_usd": "5",
@@ -17,8 +17,16 @@
       "pin_salt": "d92ddf1db40e40c87c58ea893d295f43",
       "pin_hash": "231eb8939ddd16a2a1ce7e902861ff119f75983a3e158ae52b3f8671de7a0ae0",
       "suppliers": [
-        {"label": "yiwu-lighting", "display": "Yiwu Bright Lighting Co.", "address": "0xSUPPLIER_WALLET_1"},
-        {"label": "guangzhou-cables", "display": "Guangzhou Cable Works", "address": "0xSUPPLIER_WALLET_2"}
+        {
+          "label": "yiwu-lighting",
+          "display": "Yiwu Bright Lighting Co.",
+          "address": "0xdE5Dc6e0825bda6B301FDA7FEd43571bC8d918D1"
+        },
+        {
+          "label": "guangzhou-cables",
+          "display": "Guangzhou Cable Works",
+          "address": "0xD4d38AD6C68439014c56b5269d0d25E8D76D8347"
+        }
       ]
     },
     {
@@ -30,7 +38,11 @@
       "pin_salt": "baeb97bb5816d5daa58956c5f3d716c8",
       "pin_hash": "7e2e5ebe2a456c9b4a8199d28f94e10ace502583c3ca18a4c289f75b943496fd",
       "suppliers": [
-        {"label": "shaoxing-fabrics", "display": "Shaoxing Fabric Mills", "address": "0xSUPPLIER_WALLET_3"}
+        {
+          "label": "shaoxing-fabrics",
+          "display": "Shaoxing Fabric Mills",
+          "address": "0x410cA5d44dBbc0d333941f65be2Ed3a04a51F82a"
+        }
       ]
     }
   ]

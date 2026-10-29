@@ -34,7 +34,7 @@ async def do_initialize() -> None:
     result = await client.initialize(
         reference=reference,
         amount_kobo=5000,  # NGN 50 — Paystack's minimum
-        email="smoke@customers.kudidesk.test",
+        email="smoke@customers.example.com",
         callback_url=os.getenv("PUBLIC_BASE_URL", "http://localhost:8000") + "/paid",
         metadata={"smoke": True},
     )

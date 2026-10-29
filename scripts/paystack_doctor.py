@@ -22,6 +22,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import httpx
 from dotenv import load_dotenv
 
+# Windows consoles default to cp1252 and raise on characters like arrows.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 BASE = "https://api.paystack.co"
 DASHBOARD_KEYS = "https://dashboard.paystack.com/v2/developers"
 DASHBOARD_SIGNUP = "https://dashboard.paystack.com/#/signup"
@@ -139,7 +145,7 @@ def check_initialize(key: str) -> bool:
     payload = {
         "reference": "kudidesk-doctor",
         "amount": 5000,  # kobo — NGN 50 is Paystack's minimum
-        "email": "doctor@customers.kudidesk.test",
+        "email": "doctor@customers.example.com",
         "callback_url": "http://localhost:8000/paid",
     }
     try:

@@ -79,6 +79,45 @@ wrong.
 
 ---
 
+## 2026-10-29 — Paystack rejects the `.test` email TLD, so PLAN.md §4.3's email fails
+
+Context: first real `POST /transaction/initialize` against the live Paystack test
+API, using the address the plan specifies
+(`f"{account_code.lower()}@customers.kudidesk.test"`).
+
+Raw response:
+
+```
+HTTP 400
+{"status": false, "message": "\"email\" must be a valid email"}
+```
+
+Isolation: five addresses through the same endpoint, same key, fresh references
+each time:
+
+```
+BAD 400  doctor@customers.kudidesk.test   "email" must be a valid email
+BAD 400  kd-001@customers.kudidesk.test   "email" must be a valid email
+BAD 400  kd-001@kudidesk.test             "email" must be a valid email
+OK  200  kd-001@example.com               Authorization URL created
+OK  200  kd-001@customers.example.com     Authorization URL created
+```
+
+So it is the **`.test` TLD**, not the domain, the subdomain structure, or the
+local part. Paystack validates against a real-TLD allowlist; `.test` is reserved
+by RFC 2606 and will never be in it.
+
+Fix applied: `create_naira_payment` in `tools.py` now builds
+`{account_code}@customers.example.com` — RFC 2606-reserved, syntactically valid,
+accepted by Paystack, and never deliverable (which is what a generated receipt
+address wants). `test_paystack_email_uses_a_valid_tld` pins it so nobody
+reintroduces `.test`.
+
+What this cost: one failed request on the first live call. The plan's email rule
+was written by someone who never sent it.
+
+---
+
 ## 2026-10-29 — Arc native balance is 18 dp while USDC ERC-20 is 6 dp
 
 Context: PLAN.md §2 says "sources disagree on the native balance's decimals.
