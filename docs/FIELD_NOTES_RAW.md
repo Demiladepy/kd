@@ -118,6 +118,44 @@ was written by someone who never sent it.
 
 ---
 
+## 2026-10-29 — One USDC transfer emits **two** ERC-20 Transfer logs on Arc
+
+Context: verifying the first real settlement
+(`0x9937effa85f2ed4a553a6f522484fd7818ff7ab0b6b182403e86635e49013dfd`) by
+decoding `receipt.logs` rather than trusting the client's own output.
+
+The receipt contains two `Transfer(address,address,uint256)` events, both from
+the treasury to the supplier, for the same 12 USDC:
+
+```
+topic  : 0xddf252ad... (Transfer)
+token  : 0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE
+from   : 0x611CFAcB...0a090
+to     : 0xdE5Dc6e0...18D1
+amount : 12000000000000000000   (= 12e18, i.e. 12 USDC at 18 dp)
+
+token  : 0x3600000000000000000000000000000000000000
+from   : 0x611CFAcB...0a090
+to     : 0xdE5Dc6e0...18D1
+amount : 12000000               (= 12e6, i.e. same 12 USDC at 6 dp)
+```
+
+Same transfer, logged twice at the two decimal scales already measured. The
+first event comes from Arc's native-token address, the second from the USDC
+ERC-20.
+
+Why it matters: any reconciliation code that counts or sums `Transfer` events
+without filtering by token address will double-count every settlement. For a
+payment desk that reconciles daily Paystack collections against on-chain
+payouts, that is a silent 2x error in the books.
+
+Fix applied: nothing to fix in settlement — `chain.py` reads ERC-20 `balanceOf`
+and does not aggregate logs. Recorded here so the reconciliation advice in
+`docs/GO_LIVE.md` says "filter by the ERC-20 token address and dedupe by
+transaction hash", not "sum the transfers".
+
+---
+
 ## 2026-10-29 — Server read a placeholder bearer token because it never loaded `.env`
 
 Context: local `uvicorn server.app:app` run, then the official MCP client with the

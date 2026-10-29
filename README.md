@@ -114,6 +114,7 @@ GAS_TOKEN_IS_USDC=true
 | USDC contract at `0x3600…0000` | deployed, `symbol()` = `USDC`, `decimals()` = `6` |
 | `eth_gasPrice` | 25 gwei; `baseFeePerGas` 20 gwei |
 | Block height | ~69.68M |
+| One USDC transfer | emits **two** `Transfer` logs: native `0xffff…fffe` at 18 dp and ERC-20 `0x3600…0000` at 6 dp, same sender/recipient |
 
 **The decimals trap, measured.** Arc's native balance is USDC with **18**
 decimals while the ERC-20 interface uses **6**. For
@@ -197,6 +198,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -p pytest_asyncio.plugin
 | `scripts/smoke_paystack.py` | Initialises a checkout link |
 | `scripts/smoke_chain.py` | Repeats the gate through `chain.py` |
 | `scripts/mcp_client_test.py` | MCP client over Streamable HTTP |
+| `scripts/verify_unpaid.py` | Proves an unpaid quote settles nothing (over MCP) |
 | `scripts/http_smoke.py` | `/health`, `/paid`, 401 checks |
 
 ---

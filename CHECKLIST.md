@@ -6,9 +6,9 @@ Source of truth: `PLAN.md`. One phase at a time; run the named tests/scripts and
 - [x] `scripts/gate_send_usdc.py` — prints RPC chain id (must match `CHAIN_ID`), ERC-20 USDC balance, raw native balance + interpretation, sends 1 USDC, prints explorer URL and gas paid in USDC
 - [x] Live RPC facts verified 2026-10-29: chain id `5042002`, USDC `0x3600…0000` deployed with `decimals()=6`, `symbol()=USDC`
 - [x] Decimals question answered: native = 18 dp, ERC-20 = 6 dp (see `docs/FIELD_NOTES_RAW.md`)
-- [ ] **PASS = mined tx with status 1** — needs funded treasury + real supplier wallets in `seed.json`
+- [x] **PASS = mined tx with status 1** — 2026-10-29, `0xa6e4b71d…617a151`, block 69704555, gas 0.00184875 USDC, supplier credited 1 USDC
 
-**Status:** script and chain layer verified read-only against the live node. Blocked on faucet funds (`faucet.circle.com` → Arc Testnet).
+**Status:** PASSED on Arc testnet with 60 USDC from the faucet.
 
 ## Phase 1 — Core logic, no network
 - [x] `server/store.py` — SQLite state machine, quotes, sessions, PIN attempts
@@ -48,18 +48,20 @@ Tests — **73 passed**
 - [x] `paystack.py` — httpx, 10 s timeout, one retry on 5xx/timeout
 - [x] `scripts/paystack_doctor.py` — diagnoses all five common key walls
 - [x] `scripts/smoke_paystack.py` — initialises a link
-- [ ] Human pays success test card → verify `success`
-- [ ] Failed test card → `PAYMENT_FAILED`
-- [ ] Abandoned link → `PAYMENT_NOT_COMPLETED`
+- [x] Key verified live: `GET /balance` 200, `POST /transaction/initialize` 200
+- [x] Human paid success test card → `SETTLED`, one on-chain transfer, second call `ALREADY_SETTLED`
+- [x] Abandoned link → `PAYMENT_NOT_COMPLETED`, treasury unchanged (`scripts/verify_unpaid.py`)
+- [ ] Failed test card → `PAYMENT_FAILED` (needs one declined-card checkout in a browser)
 
-**Status:** blocked on a `sk_test_` key. Path documented in README → "Getting Paystack test keys".
+**Status:** success and abandoned verified end to end. Declined card is the only unrun case.
 
 ## Phase 3 — Real chain
 - [x] `chain.py` — ERC-20 balance, transfer, receipt, pending nonce, 45 s wait, fee history, gas estimate with fallback
 - [x] Chain id asserted against `CHAIN_ID` at call time
 - [x] Explorer URL built from `EXPLORER_TX_URL`
 - [x] `scripts/smoke_chain.py`
-- [ ] Gate repeated through `chain.py` with a funded treasury
+- [x] Gate repeated through `chain.py` with a funded treasury
+- [x] Receipt decoded independently: 1 mined tx, status 1, ERC-20 `Transfer` to the seeded supplier address
 
 ## Phase 4 — MCP server
 - [x] 4 tools on `FastMCP(stateless_http=True, json_response=True)`
@@ -68,7 +70,9 @@ Tests — **73 passed**
 - [x] Request forensics → `logs/inbound.jsonl` (auth redacted, JSON-RPC method, `params._meta`)
 - [x] `scripts/mcp_client_test.py`, `scripts/http_smoke.py`
 - [x] Local verification: `/health` 200, `/paid` 200, no token 401, wrong token 401, correct token 200
-- [ ] Full happy path through the MCP client with a human paying
+- [x] Full happy path through the MCP client: quote → link → pay → `SETTLED` → explorer link
+- [x] Double "I've paid" over MCP: second call `ALREADY_SETTLED`, one transfer
+- [x] `/paid` page renders in a real browser after Paystack redirect
 - [ ] Watch for 406 on `Accept` when Chord calls
 
 ## Phase 5 — Deploy
