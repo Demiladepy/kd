@@ -1,0 +1,22 @@
+# Secrets — never commit
+.env
+.env.local
+*.pem
+*.key
+
+# Runtime state
+kudidesk.db
+kudidesk.db-journal
+*.db
+*.sqlite3
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/

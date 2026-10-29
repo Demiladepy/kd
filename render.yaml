@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: kudidesk
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: MCP_BEARER_TOKEN
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: BASE_SEPOLIA_RPC
+        value: https://sepolia.base.org
+      - key: TREASURY_PRIVATE_KEY
+        sync: false
+      - key: USDC_ADDRESS
+        value: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+      - key: DB_PATH
+        value: ./kudidesk.db

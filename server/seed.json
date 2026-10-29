@@ -1,0 +1,37 @@
+{
+  "desk": {
+    "name": "KudiDesk",
+    "ngn_per_usd": 0,
+    "fee_pct": "1.5",
+    "quote_ttl_minutes": 10,
+    "min_usd": "5",
+    "treasury_min_buffer_usdc": "2"
+  },
+  "customers": [
+    {
+      "account_code": "KD-001",
+      "phone": "+2348000000001",
+      "name": "Chinedu Okafor",
+      "business": "Okafor Electricals, Alaba International Market",
+      "max_usd_per_payment": "50",
+      "pin_salt": "d92ddf1db40e40c87c58ea893d295f43",
+      "pin_hash": "231eb8939ddd16a2a1ce7e902861ff119f75983a3e158ae52b3f8671de7a0ae0",
+      "suppliers": [
+        {"label": "yiwu-lighting", "display": "Yiwu Bright Lighting Co.", "address": "0xSUPPLIER_WALLET_1"},
+        {"label": "guangzhou-cables", "display": "Guangzhou Cable Works", "address": "0xSUPPLIER_WALLET_2"}
+      ]
+    },
+    {
+      "account_code": "KD-002",
+      "phone": "+2348000000002",
+      "name": "Aisha Bello",
+      "business": "Bello Textiles, Trade Fair Complex",
+      "max_usd_per_payment": "30",
+      "pin_salt": "baeb97bb5816d5daa58956c5f3d716c8",
+      "pin_hash": "7e2e5ebe2a456c9b4a8199d28f94e10ace502583c3ca18a4c289f75b943496fd",
+      "suppliers": [
+        {"label": "shaoxing-fabrics", "display": "Shaoxing Fabric Mills", "address": "0xSUPPLIER_WALLET_3"}
+      ]
+    }
+  ]
+}
