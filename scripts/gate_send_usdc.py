@@ -11,6 +11,7 @@ Pass = a mined receipt with status 1.
 """
 
 import asyncio
+import json
 import os
 import sys
 from decimal import Decimal, ROUND_DOWN
@@ -19,11 +20,30 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 
-from server.chain import ChainClient, ChainConfigError
+from server.chain import ChainClient, ChainConfigError, is_valid_address
 
-# Phase 0 only. A placeholder from seed.json will not resolve on any chain.
-SUPPLIER_ADDRESS = os.getenv("GATE_SUPPLIER_ADDRESS", "0xSUPPLIER_WALLET_1")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEND_USDC = "1"
+
+
+def configured_supplier(customer: str = "KD-001", label: str = "yiwu-lighting") -> str:
+    """The address the server would actually pay for this supplier.
+
+    Read from seed.json so the gate tests the same address settlement uses,
+    instead of a copy that can drift.
+    """
+    override = os.getenv("GATE_SUPPLIER_ADDRESS")
+    if override:
+        return override
+    with open(os.path.join(ROOT, "server", "seed.json"), encoding="utf-8") as fh:
+        seed = json.load(fh)
+    for cust in seed.get("customers", []):
+        if cust.get("account_code") != customer:
+            continue
+        for sup in cust.get("suppliers", []):
+            if sup.get("label") == label:
+                return sup.get("address", "")
+    return ""
 
 
 def fail(msg: str) -> None:
@@ -80,9 +100,16 @@ async def main() -> None:
     if usdc < Decimal(SEND_USDC) + fee_usdc:
         fail(f"treasury needs at least {Decimal(SEND_USDC) + fee_usdc} USDC, has {usdc}")
 
-    # 4. Send 1 USDC.
+    # 4. Send 1 USDC to the supplier the server would really pay.
+    supplier = configured_supplier()
+    if not is_valid_address(supplier):
+        fail(
+            f"supplier address is not configured (got {supplier!r}). "
+            "Fix server/seed.json or set GATE_SUPPLIER_ADDRESS."
+        )
+    print(f"paying supplier    : {supplier}")
     try:
-        sent = await chain.transfer_usdc(SUPPLIER_ADDRESS, SEND_USDC)
+        sent = await chain.transfer_usdc(supplier, SEND_USDC)
     except Exception as exc:
         fail(f"transfer failed: {type(exc).__name__}: {exc}")
 

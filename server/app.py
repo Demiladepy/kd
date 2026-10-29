@@ -1,6 +1,13 @@
 import os
 import json
 from typing import Any
+
+from dotenv import load_dotenv
+
+# Local runs read .env; on Render the dashboard provides the real env vars and
+# load_dotenv() is a no-op when no file is present.
+load_dotenv()
+
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse, HTMLResponse
