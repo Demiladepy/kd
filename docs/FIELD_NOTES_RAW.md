@@ -118,6 +118,37 @@ was written by someone who never sent it.
 
 ---
 
+## 2026-10-29 — Server read a placeholder bearer token because it never loaded `.env`
+
+Context: local `uvicorn server.app:app` run, then the official MCP client with the
+real `MCP_BEARER_TOKEN` from `.env`.
+
+Raw response:
+
+```
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url
+'http://127.0.0.1:8000/mcp'
+```
+
+What made it confusing: `scripts/http_smoke.py` passed with a *good* token in the
+same minute. That script boots its own app in-process with
+`MCP_BEARER_TOKEN=test-token-123`, so it was proving the middleware worked, not
+that the running server had the right token.
+
+How I found the cause: `os.getenv("MCP_BEARER_TOKEN", "change-me-long-random")`
+in `app.py` — the default was in use. Each script called `load_dotenv()`; the
+server itself never did. On Render the dashboard provides env vars so nothing
+looked wrong there, which is exactly why it survived until the first real local
+client call.
+
+Fix applied: `load_dotenv()` at the top of `server/app.py`, before `KudiDeskTools`
+is constructed. It is a no-op when no `.env` exists, so Render is unaffected.
+
+Worth noting for the write-up: a smoke script that boots its own app can pass
+while the real server is misconfigured. Test the thing you deploy.
+
+---
+
 ## 2026-10-29 — Arc native balance is 18 dp while USDC ERC-20 is 6 dp
 
 Context: PLAN.md §2 says "sources disagree on the native balance's decimals.
