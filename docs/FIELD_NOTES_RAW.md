@@ -118,7 +118,47 @@ was written by someone who never sent it.
 
 ---
 
-## 2026-10-29 — One USDC transfer emits **two** ERC-20 Transfer logs on Arc
+## 2026-10-30 — MCP transport returns 421 for every public hostname (only when bound to loopback)
+
+Context: exposing the local server through a Cloudflare tunnel so Chord could
+reach it without waiting for Render.
+
+Raw error:
+
+```
+httpx.HTTPStatusError: Client error '421 Misdirected Request' for url
+'https://chris-pci-illustrated-tide.trycloudflare.com/mcp'
+```
+
+Cause, from `mcp/server/fastmcp/server.py:191`:
+
+```python
+if transport_security is None and host in ("127.0.0.1", "localhost", "::1"):
+    transport_security = TransportSecuritySettings(
+        ...
+        allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"],
+    )
+```
+
+So when the server binds to loopback, the SDK turns on DNS-rebinding protection
+with a localhost-only allowlist. `_validate_host` accepts an exact match or a
+`host:*` prefix, so the tunnel hostname is rejected with 421. Note that `"*"` is
+not a wildcard — passing it does not help.
+
+The nasty part: bind to `0.0.0.0` (what Render does) and that `if` is false, so
+`transport_security` stays `None`, and the middleware constructor falls back to
+`enable_dns_rebinding_protection=False`. The same code is therefore **strict
+when run locally and permissive in production**, which is exactly backwards from
+what you want.
+
+Fix applied: `server/app.py` sets `transport_security` explicitly, so behaviour
+does not depend on the bind address. Default is protection off (the endpoint is
+already behind the bearer token); set `MCP_ALLOWED_HOSTS` to a comma-separated
+list to enable it with explicit hosts.
+
+---
+
+## 2026-10-30 — One USDC transfer emits **two** ERC-20 Transfer logs on Arc
 
 Context: verifying the first real settlement
 (`0x9937effa85f2ed4a553a6f522484fd7818ff7ab0b6b182403e86635e49013dfd`) by

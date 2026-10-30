@@ -9,13 +9,41 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse, HTMLResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .tools import KudiDeskTools
 
-mcp = FastMCP("kudidesk", stateless_http=True, json_response=True)
+
+def _transport_security() -> TransportSecuritySettings:
+    """Host/Origin validation for the MCP transport.
+
+    The SDK defaults to DNS-rebinding protection with an *empty* allowlist,
+    which rejects every Host header that is not an exact match - so any public
+    hostname (Render, a tunnel) gets 421 Misdirected Request. "*" is not a
+    wildcard either; only exact values and "host:*" patterns match.
+
+    Set MCP_ALLOWED_HOSTS="kudidesk.onrender.com,localhost:8000" to turn it on
+    with explicit hosts. Left unset, we disable it: the endpoint is already
+    gated by the bearer token, so a browser on this machine gains nothing.
+    """
+    hosts = [h.strip() for h in os.getenv("MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
+    if hosts:
+        return TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=hosts,
+            allowed_origins=hosts,
+        )
+    return TransportSecuritySettings(enable_dns_rebinding_protection=False)
+
+mcp = FastMCP(
+    "kudidesk",
+    stateless_http=True,
+    json_response=True,
+    transport_security=_transport_security(),
+)
 tools = KudiDeskTools()
 
 # Ensure logs directory exists

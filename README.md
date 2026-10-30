@@ -201,6 +201,19 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -p pytest_asyncio.plugin
 | `scripts/verify_unpaid.py` | Proves an unpaid quote settles nothing (over MCP) |
 | `scripts/http_smoke.py` | `/health`, `/paid`, 401 checks |
 
+### MCP transport and host checking
+
+The MCP SDK's DNS-rebinding protection only switches itself on when the server
+binds to loopback, and then only allows `localhost` — so a tunnel or proxy
+hostname gets **421 Misdirected Request**. Bound to `0.0.0.0`, the same code
+disables the check entirely. `server/app.py` sets it explicitly so behaviour is
+identical everywhere: off by default (the bearer token is the gate), or on with
+an explicit allowlist:
+
+```
+MCP_ALLOWED_HOSTS=kudidesk.onrender.com,localhost:8000
+```
+
 ---
 
 ## Deploy to Render
