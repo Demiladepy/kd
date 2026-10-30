@@ -22,7 +22,7 @@ Source of truth: `PLAN.md`. One phase at a time; run the named tests/scripts and
 - [x] Treasury check includes gas ceiling + buffer
 - [x] Placeholder supplier addresses refused **before** payment
 
-Tests — **73 passed**
+Tests — **74 passed**
 - [x] unsaved supplier rejected
 - [x] supplier belonging to another customer rejected
 - [x] placeholder supplier address refused before any link is issued
@@ -73,6 +73,8 @@ Tests — **73 passed**
 - [x] Full happy path through the MCP client: quote → link → pay → `SETTLED` → explorer link
 - [x] Double "I've paid" over MCP: second call `ALREADY_SETTLED`, one transfer
 - [x] `/paid` page renders in a real browser after Paystack redirect
+- [x] `transport_security` set explicitly — the SDK's default only allowed `localhost` when bound to loopback, so every tunnel/proxy hostname got 421 (see `docs/FIELD_NOTES_RAW.md`); enable with `MCP_ALLOWED_HOSTS`
+- [x] Public HTTPS run verified through a Cloudflare tunnel: `/health` 200, `/paid` 200, full MCP client path (tools, session, quote, Paystack link)
 - [ ] Watch for 406 on `Accept` when Chord calls
 
 ## Phase 5 — Deploy
@@ -97,10 +99,14 @@ Tests — **73 passed**
 - [ ] Publish + activate; in-app chat, then simulator
 - [ ] Record credits used per conversation
 
+**Blocker:** Chord cannot reach loopback, so this needs a public HTTPS URL. A
+Cloudflare quick tunnel works for one session but the hostname dies with the
+connection — use Render for anything that has to survive a recording.
+
 ## Phase 8 — Write-up
 - [x] `README.md` (run, env, Paystack keys, Arc facts, deploy, Chord, red-team, AI usage)
-- [x] `docs/FIELD_NOTES_RAW.md` — 6 real entries
-- [ ] `docs/FIELD_NOTES.md` — human to write from the raw entries
+- [x] `docs/FIELD_NOTES_RAW.md` — 9 real entries
+- [x] `docs/FIELD_NOTES.md` — 3 entries written from the raw ones (decimals, Paystack `.test`, double `Transfer` logs)
 - [x] `docs/GO_LIVE.md`
 - [x] `docs/SUBMISSION.md`
 - [x] `docs/LATER.md`, `docs/QUESTIONS.md`

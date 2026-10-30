@@ -10,6 +10,9 @@ to suppliers by label; the server resolves labels to addresses from a fixed
 allowlist in `seed.json`. A wallet address typed into chat is always escalated to
 a human.
 
+> Picking this up mid-task? Read [`HANDOFF.md`](HANDOFF.md) first — run commands,
+> env vars, what is verified, and the four things still outstanding.
+
 ---
 
 ## What it does
