@@ -1,44 +1,52 @@
-# Go-Live Checklist
+# Go-live note (for the desk owner)
 
-**For the desk owner. Half a page. Read this before taking a single real naira.**
+Read this before you take real customer naira.
 
-## What it does
+## What KudiDesk does
 
-Quotes a naira rate for a supplier invoice, collects the naira by card or bank
-transfer through Paystack, confirms the money actually arrived, then pays the
-supplier in dollar stablecoin and gives you a public link to the transfer.
+On WhatsApp, a known customer can:
+
+1. Sign in with account code + PIN  
+2. Get a locked naira quote for a USD supplier invoice  
+3. Pay that naira on Paystack  
+4. After payment is verified, send dollar stablecoin to a **supplier already on file**  
+5. Get a public explorer link as proof  
 
 ## What it does not do
 
-It cannot add a new supplier, change where money goes, refund anyone, handle a
-second currency, or negotiate a price. Those always go to a human. It also does
-not confirm payment by itself — see the webhook note below.
+- Add a new supplier or change a wallet in chat  
+- Refund anyone  
+- Handle other currencies  
+- Negotiate the rate  
+- Trust a screenshot as proof of payment  
 
-## Before real customers
+Those stay with a human.
 
-- [ ] **Live Paystack keys** and a verified business (test keys start `sk_test_`, live `sk_live_`; the server refuses to boot on a live key today, on purpose)
-- [ ] **WhatsApp Business number** connected to the agent
-- [ ] **A real treasury on a mainnet chain**, held by a multisig or a custodian — never a raw private key in a server environment variable
-- [ ] **KYC/KYB** on every importer and every supplier
-- [ ] **Regulatory review** of running a crypto/FX desk in Nigeria before the first customer
-- [ ] **A live rate feed** with a written spread policy; today the rate is typed into `seed.json`
-- [ ] **A persistent database** — the demo uses SQLite on an ephemeral disk and loses state on redeploy
-- [ ] **A Paystack webhook** so settlement does not depend on the customer typing "I've paid"
+## Must be true before real customers
 
-## When things break
+| Item | Why |
+|---|---|
+| Live Paystack keys + verified business | Demo uses `sk_test_` only. Server refuses `sk_live_` today on purpose. |
+| WhatsApp Business number on the agent | Simulator is not production. |
+| Treasury on mainnet, under multisig/custody | Do not leave a raw private key in a server env var. |
+| KYC/KYB on importers and suppliers | Compliance before volume. |
+| Legal review for crypto/FX desk in Nigeria | Do not skip this. |
+| Live FX rate + written spread policy | Today the rate is typed into `seed.json`. |
+| Database that survives redeploy | Demo SQLite on Render free disk can reset. |
+| Paystack webhook | Demo waits for the customer to say “I’ve paid.” That is not safe at scale. |
 
-| Situation | What it means | What to do |
+## When something breaks
+
+| What you see | Meaning | What to do |
 |---|---|---|
-| Payment failed or abandoned | **No money moved** | Nothing. The customer can retry the same link |
-| Paid but not settled (`TREASURY_LOW`) | Customer's naira is in, payout did not happen | The alert carries the quote id. Top up the treasury and pay it manually the same day |
-| Settlement timed out | Transaction is in flight | Open the explorer link from the alert and wait. **Never re-send** — the system will not send twice |
-| Transaction reverted (`SETTLE_FAILED`) | Paid out but failed on-chain | Check the explorer link; refund or re-pay manually |
+| Payment failed or abandoned | No money moved | Customer retries the same link |
+| Paid but `TREASURY_LOW` | Naira in, payout blocked | Top up treasury; pay that quote manually same day |
+| Settlement pending / timeout | Tx may still be mining | Watch the explorer link. Do **not** resend — the system will not double-pay |
+| `SETTLE_FAILED` | On-chain failure | Check explorer; refund or repay by hand |
 
-## Daily operating routine
+## Daily ops
 
-- Check the treasury balance every morning. Keep at least two days of expected
-  payouts, plus the gas buffer.
-- Alert if the treasury falls below one day of expected volume.
-- Reconcile Paystack collections against on-chain payouts daily.
-- One named person on call for `TREASURY_LOW` and `SETTLE_FAILED` alerts, with a
-  published response time during business hours.
+- Check treasury every morning (≈ two days of payouts + gas buffer)  
+- Alert when balance falls under one day of volume  
+- Reconcile Paystack inflows vs on-chain outflows daily — filter by ERC-20 USDC and tx hash, never sum raw Transfer logs  
+- One named person on call for `TREASURY_LOW` and `SETTLE_FAILED` during business hours  

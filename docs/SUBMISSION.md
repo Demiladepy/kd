@@ -1,5 +1,13 @@
 # Submission
 
-**Role:** Product Engineer — closest to your Technical PM weighting: payment integration and the go-live note.
+**Role preference:** Technical Product Management (also strong fit for Forward-deployed Engineering). I weighted this build toward payment integration and the go-live note.
 
-KudiDesk helps Lagos importers at Alaba and Trade Fair pay their Chinese suppliers quickly and safely. By quoting locked naira rates, collecting via Paystack, and settling in USDC on Arc testnet to pre-saved suppliers, it removes the manual hassle of running a supplier payment desk while enforcing strict guardrails that prevent the agent from choosing where money goes. It's worth paying for because it saves time, reduces errors, and provides auditability through on-chain settlement. Deliberately left out: adding suppliers in chat, refunds, live FX API, KYC, and mainnet operations - all of which require additional compliance, custody, and regulatory considerations before going live.
+**Business:** Lagos importers at Alaba and Trade Fair who already pay Chinese suppliers over WhatsApp through informal FX desks.
+
+**Problem:** Rate confusion, screenshot “proof,” and money sent to the wrong wallet. Slow, stressful, easy to lose funds.
+
+**What KudiDesk does:** PIN auth, locked naira quote, Paystack collection, verify, then USDC to a **pre-saved** supplier only — the agent never chooses a destination. Worth paying for because it cuts desk time and removes the highest-cost failure mode (wrong wallet).
+
+**Left out on purpose:** adding suppliers in chat, refunds, live FX API, KYC, mainnet. Those need compliance and custody before real volume.
+
+**Demo chain:** Arc testnet (exercise settlement rail). Production would use live Paystack, a real WhatsApp number, and a custodian-held treasury.

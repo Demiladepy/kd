@@ -1,112 +1,127 @@
 # Field Notes
 
-*Three real entries, written as the problems happened. Raw logs are in
-[`FIELD_NOTES_RAW.md`](FIELD_NOTES_RAW.md); nothing here was reconstructed.*
+Three problems I hit while building. Each one was real. Raw scrapes are in
+[`FIELD_NOTES_RAW.md`](FIELD_NOTES_RAW.md).
 
 ---
 
-## The same USDC is 18 decimals and 6 decimals at once
+## 1. Arc USDC has two decimal systems
 
-**What happened:** before trusting a treasury balance, I compared
-`eth_getBalance` with the ERC-20 `balanceOf()` for three live Arc addresses at
-block 69,684,820:
+**What happened**
 
-```
-address                                      native / 1e18        erc20 / 1e6
-0x9143698409426ac33b277decc9f20fa9049887ec   223.473480851711701627  223.473480
-0xd731d8b19205fe7a9a93ebed1da2f35d54af9c82    85.604548819568282194   85.604548
-0x24a078b7eb595c6b0f43dbf574a7282931a50d1a     5.483392876667516447    5.483392
-```
+I checked the same wallet with `eth_getBalance` and ERC-20 `balanceOf()`. The
+numbers looked unrelated until I divided them:
 
-Ratio in every sample: ~1e12. Same asset, two scales.
+| Address (short) | Native ÷ 1e18 | ERC-20 ÷ 1e6 |
+|---|---|---|
+| `0x9143…87ec` | 223.473480851711701627 | 223.473480 |
+| `0xd731…9c82` | 85.604548819568282194 | 85.604548 |
+| `0x24a0…0d1a` | 5.483392876667516447 | 5.483392 |
 
-**How I found the cause:** PLAN.md §2 flagged that sources disagree and told me
-to verify on day one. The native number is not a 6-decimal dollar figure — it is
-the same USDC at 18 dp, with sub-micro dust that `balanceOf()` truncates.
+Same USDC. Native uses 18 decimals. ERC-20 uses 6. Ratio is about 1e12.
 
-**Fix / workaround:** `server/chain.py` never mixes the two. Every money read uses
-ERC-20 `balanceOf()`; the native balance is used only for gas, converted by an
-explicit `native_to_usdc()` that divides by 1e18. A unit test pins the 1e12
-relationship so nobody "simplifies" it later.
+**Cause**
 
-**What Chord should change:** the simulator's Arc primer should state the two
-scales side by side with one worked example. A builder who treats
-`eth_getBalance` as dollars under-reports the treasury by 1e12 — it looks empty,
-or worse, a payout looks affordable when it is not.
+I treated `eth_getBalance` like a dollar balance. On Arc it is not.
+
+**Fix**
+
+Money checks use `balanceOf()` only. Native balance is for gas. A unit test locks
+the 1e12 relationship so nobody “simplifies” this later.
+
+**Ask for Chord**
+
+Put one worked example in the Arc notes: native vs ERC-20 side by side. Builders
+who miss this think the treasury is empty — or approve a payout they cannot fund.
 
 ---
 
-## Paystack rejects the email address the plan specifies
+## 2. Paystack rejects `.test` emails
 
-**What happened:** the first real `POST /transaction/initialize` against the
-Paystack test API, using PLAN.md §4.3's generated receipt address:
+**What happened**
 
-```
+First live `POST /transaction/initialize` failed:
+
+```text
 HTTP 400
-{"status": false, "message": "\"email\" must be a valid email"}
+"email" must be a valid email
 ```
 
-**How I found the cause:** five addresses through the same endpoint, same key,
-fresh reference each time:
+I was using addresses like `kd-001@customers.kudidesk.test` from the plan.
 
-```
-BAD 400  doctor@customers.kudidesk.test   "email" must be a valid email
-BAD 400  kd-001@customers.kudidesk.test   "email" must be a valid email
-BAD 400  kd-001@kudidesk.test             "email" must be a valid email
-OK  200  kd-001@example.com               Authorization URL created
-OK  200  kd-001@customers.example.com     Authorization URL created
-```
+**Cause**
 
-So it is the **`.test` TLD**, not the domain, the subdomain, or the local part.
-Paystack validates against a real-TLD allowlist, and `.test` is reserved by
-RFC 2606 — it can never be on that list.
+I tried five addresses. Anything ending in `.test` failed. `example.com` worked.
+Paystack wants a real TLD. `.test` is reserved and never will be.
 
-**Fix / workaround:** `create_naira_payment` now builds
-`{account_code}@customers.example.com`: reserved, syntactically valid, accepted
-by Paystack, and guaranteed undeliverable, which is what you want for a receipt
-address. `test_paystack_email_uses_a_valid_tld` pins it.
+**Fix**
 
-**What Chord should change:** any prompt or sample code that generates an email
-for a payment provider should use `example.com`, not `.test`. Three of the four
-failing addresses were plausible; only the TLD was wrong, and the API's error
-message points at the whole field.
+Receipt emails are now `{account_code}@customers.example.com`. Valid for the API,
+not a real inbox. Covered by a unit test.
+
+**Ask for Chord**
+
+If sample code invents emails for Paystack, use `example.com`, not `.test`. The
+error message blames the whole email field, so you waste time on the wrong part.
 
 ---
 
-## One settlement logs two `Transfer` events
+## 3. One payout shows two Transfer logs
 
-**What happened:** verifying the first real payout
-(`0x9937effa85f2ed4a553a6f522484fd7818ff7ab0b6b182403e86635e49013dfd`) by
-decoding `receipt.logs` instead of trusting my own client output. Two
-`Transfer(address,address,uint256)` events, same treasury, same supplier, same
-12 USDC:
+**What happened**
 
-```
-token  : 0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE   amount: 12000000000000000000  (12e18)
-token  : 0x3600000000000000000000000000000000000000   amount: 12000000              (12e6)
-```
+I decoded the first real settlement receipt. Same 12 USDC, same parties, two
+`Transfer` events — one at 18 decimals on the native token address, one at 6
+decimals on the USDC contract.
 
-**How I found the cause:** the two token addresses are exactly the two decimal
-scales from the entry above — Arc logs the transfer once from its native-token
-address and once from the USDC ERC-20. Filtering by `from`/`to` alone returns
-both.
+**Cause**
 
-**Fix / workaround:** settlement never aggregates logs — it reads ERC-20
-`balanceOf()` before and after, and the transaction hash is the idempotency key.
-`docs/GO_LIVE.md` now says a reconciliation job must filter by the ERC-20 token
-address and dedupe by transaction hash, never "sum the transfers".
+Same decimals split as above. Arc emits both. If you sum Transfers by
+from/to only, books look 2× too high.
 
-**What Chord should change:** this is the kind of detail that belongs in the
-platform's Arc notes next to the decimals. Silent 2x errors in a payment desk's
-books are found at month-end, not at build time.
+**Fix**
+
+We do not sum logs for reconciliation. We use ERC-20 balances and the tx hash as
+the idempotency key. The go-live note tells the operator the same rule.
+
+**Ask for Chord**
+
+Document this next to the decimals note. A silent 2× error shows up at month-end,
+not in the first demo.
 
 ---
 
-## Also worth reading
+## 4. Chord MCP health timed out on a sleeping Render box
 
-`FIELD_NOTES_RAW.md` has the rest, all from real runs: the `mcp` 2.x rename that
-breaks the plan's import path, the MCP 421 that only fires when the server binds
-to loopback (strict locally, permissive in production), a bearer token that was
-never loaded because the server skipped `load_dotenv()`, `eth_estimateGas`
-reverting on an unfunded treasury, and a placeholder supplier address that would
-have taken the customer's money for a payout that could not happen.
+**What happened**
+
+Workspace showed `kudidesk` Enabled. Chord → Tools / Health returned **504**.
+WhatsApp simulator then said it had no payment tools — skill loaded, MCP not
+reachable in that session.
+
+**Cause**
+
+Free Render sleeps when idle. Cold start can take 30–50s. Chord’s probe gave up
+before the process was up. Our own client worked after waking `/health` first.
+
+**Fix / workaround**
+
+Hit `https://kudidesk.onrender.com/health` until `{"ok":true}`, then re-run
+Health / Tools in Chord. For demos, wake the box before the reviewer opens the
+simulator.
+
+**Ask for Chord**
+
+Longer timeout on MCP health for known cold hosts, or a clearer error like
+“upstream timed out / try again” instead of a bare 504. Also: teammate Tools UI
+made it hard to see that a workspace MCP was already attached — “Add tool” only
+opened the workspace registry again.
+
+---
+
+## Other real issues (raw log)
+
+MCP 2.x rename vs pinned v1, 421 Misdirected Request on tunnel hostnames,
+`.env` not loaded so a placeholder bearer was used, `eth_estimateGas` on an
+empty treasury, refusing placeholder supplier addresses before payment. Details
+in `FIELD_NOTES_RAW.md`.
