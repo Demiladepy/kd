@@ -44,9 +44,6 @@ Those stay with a human.
 | Settlement pending / timeout | Tx may still be mining | Watch the explorer link. Do **not** resend — the system will not double-pay |
 | `SETTLE_FAILED` | On-chain failure | Check explorer; refund or repay by hand |
 
-## Daily ops
-
-- Check treasury every morning (≈ two days of payouts + gas buffer)  
-- Alert when balance falls under one day of volume  
-- Reconcile Paystack inflows vs on-chain outflows daily — filter by ERC-20 USDC and tx hash, never sum raw Transfer logs  
-- One named person on call for `TREASURY_LOW` and `SETTLE_FAILED` during business hours  
+**Daily:** keep two days of payouts plus gas in the treasury, and reconcile
+inflows against outflows by ERC-20 USDC address and tx hash — never sum raw
+`Transfer` logs.

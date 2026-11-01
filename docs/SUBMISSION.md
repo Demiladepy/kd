@@ -1,6 +1,6 @@
 # Submission
 
-**Role preference:** Technical Product Management (also strong fit for Forward-deployed Engineering). I weighted this build toward payment integration and the go-live note.
+**Role:** Product Engineer (also a strong fit for Forward-deployed Engineering). I weighted this build toward payment integration and the go-live note.
 
 **Business:** Lagos importers at Alaba and Trade Fair who already pay Chinese suppliers over WhatsApp through informal FX desks.
 
