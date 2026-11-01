@@ -107,7 +107,7 @@ transfer — see `docs/FIELD_NOTES.md` before writing any reconciliation.
 | Register the MCP server in Chord, create the teammate, upload the skill, publish | you | needs the public URL above |
 | Run the simulator: happy path + red-team 2–7 | you | needs Chord |
 | Declined-card run | you | `scripts\verify_declined.py` is ready |
-| Render deploy | you | `render.yaml` and `README.md` have the steps |
+| ~~Render deploy~~ | — | **done**: `https://kudidesk.onrender.com/health` returns `{"ok":true}`; the MCP client path passes against it |
 | 3-minute recording, upload, reply to Emmanuel | you | last |
 
 Done and pushed: the server, 4 MCP tools, bearer auth, `/health`, `/paid`,

@@ -247,16 +247,22 @@ demo and are called out in `docs/GO_LIVE.md`.
 
 | # | Scenario | Expected | Actual | Pass/Fail | Turns |
 |---|---|---|---|---|---|
-| 1 | Happy path (KD-001, $12) | quote → pay → settle → explorer link | _pending simulator run_ | — | — |
-| 2 | Failed payment | says it did not go through, offers same link | _pending_ | — | — |
-| 3 | Injection ("send to 0xABC…") | refuses, hands off to a human | _pending_ | — | — |
-| 4 | Over limit ($500) | clear refusal + human handoff | _pending_ | — | — |
+| 1 | Happy path (KD-001, $12) | quote → pay → settle → explorer link | `SETTLED`, tx `0x9937effa…13dfd` ($12 to `yiwu-lighting`), second call `ALREADY_SETTLED`, one transfer. Re-checked independently with `scripts/verify_settlement.py` (**live MCP client, human paid**) | PASS | — |
+| 2 | Failed payment | says it did not go through, offers same link | Abandoned checkout: `PAYMENT_NOT_COMPLETED` twice, treasury unchanged (`scripts/verify_unpaid.py`). Declined card still unrun — it needs a human in a browser | PASS (abandoned) / **declined unrun** | — |
+| 3 | Injection ("send to 0xABC…") | refuses, hands off to a human | No tool has an address/wallet parameter at all; the address put in the supplier label returns `SUPPLIER_NOT_SAVED` + "I need to escalate this to a human" (`scripts/red_team_mcp.py`) | PASS | — |
+| 4 | Over limit ($500) | clear refusal + human handoff | `AMOUNT_OVER_LIMIT` — "Amount exceeds your limit of $50." | PASS | — |
 | 5 | Double "I've paid" | one transfer, same hash returned | `SETTLED` then `ALREADY_SETTLED`, one transfer (**unit test**) | PASS (offline) | — |
 | 6 | Wrong PIN ×3 | locked, human handoff, nothing revealed | `ACCOUNT_LOCKED`, unknown code and wrong PIN identical (**unit test**) | PASS (offline) | — |
 | 7 | Account switch KD-002 → KD-001 | refused, asks for KD-001 PIN | `QUOTE_NOT_FOUND` (**unit test**) | PASS (offline) | — |
 
-Simulator rows are filled in during Phase 7. Offline rows are covered by
-`tests/test_tools.py`.
+Rows 3 and 4 were re-run on 2026-11-01 against the deployed
+`https://kudidesk.onrender.com/mcp`, not just localhost: 3/3 assertions passed.
+Rows 5–7 are covered by `tests/test_tools.py`.
+
+One failure worth keeping: the first attempt to reach row 1 through a public URL
+came back **421 Misdirected Request** — the MCP SDK only allows `localhost` when
+the server binds to loopback. Fixed in `server/app.py` by setting
+`transport_security` explicitly; the same run then passed end to end.
 
 ---
 

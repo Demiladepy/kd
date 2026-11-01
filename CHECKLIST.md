@@ -79,9 +79,9 @@ Tests — **74 passed**
 
 ## Phase 5 — Deploy
 - [x] `render.yaml` — secrets `sync: false`, chain config in file
-- [ ] Set env vars in Render dashboard
-- [ ] Run `mcp_client_test.py` against the public URL
-- [ ] Note cold-start behaviour
+- [x] Set env vars in Render dashboard — `https://kudidesk.onrender.com/health` returns `{"ok":true}`
+- [x] Run `mcp_client_test.py` against the public URL — full path (tools, session, quote, Paystack link) passed on the deployed build
+- [x] Note cold-start behaviour: the first `/health` after idle timed out at 25 s; the same request with a 90 s budget returned `{"ok":true}`. Wake the service before a demo and keep a 10-minute ping on it
 
 ## Phase 6 — Skill
 - [x] `SKILL.md` (frontmatter: name + description only)
@@ -99,9 +99,13 @@ Tests — **74 passed**
 - [ ] Publish + activate; in-app chat, then simulator
 - [ ] Record credits used per conversation
 
-**Blocker:** Chord cannot reach loopback, so this needs a public HTTPS URL. A
-Cloudflare quick tunnel works for one session but the hostname dies with the
-connection — use Render for anything that has to survive a recording.
+**Blocker:** Chord cannot reach loopback, so this needs a public HTTPS URL.
+`https://kudidesk.onrender.com` is live and passes the MCP client path, so the
+servers side is ready — the remaining steps need the Chord account itself.
+
+Scenarios 3 and 4 are verified against the deployed endpoint
+(`scripts/red_team_mcp.py`, 3/3). Scenarios 1 and 2 need a human in a browser to
+pay or decline, which is what the recording is for.
 
 ## Phase 8 — Write-up
 - [x] `README.md` (run, env, Paystack keys, Arc facts, deploy, Chord, red-team, AI usage)
